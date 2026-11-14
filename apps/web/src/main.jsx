@@ -1,9 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { ScenarioChart, ScenarioMiniChart } from './ScenarioChart.jsx';
 import './style.css';
 
 const usd = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'USD' });
 const number = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 8 });
+const percent = new Intl.NumberFormat('es-AR', { style: 'percent', maximumFractionDigits: 2 });
+const signedUsd = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'USD', signDisplay: 'exceptZero' });
+
+function roundedMoney(value) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
 const goals = { explore: 'Explorar opciones', liquidity: 'Disponer del dinero pronto', date: 'Invertir hasta una fecha', growth: 'Crecer a largo plazo' };
 const countries = { AR: 'Argentina', US: 'Estados Unidos' };
 const symbols = { Referencia: '＝', 'Plazo fijo': '◴', Bono: '▤', ETF: '◫', Fondo: '◈', Acción: '↗', Cripto: '₿' };
@@ -27,8 +34,9 @@ function Controls({ values, update, submit }) {
 }
 
 function Result({ entry, amount, open }) {
-  const main = entry.totals?.[entry.totals.length === 3 ? 1 : 0];
-  const change = main - amount;
+  const variable = entry.totals?.length === 3;
+  const total = entry.totals?.[variable ? 1 : 0];
+  const change = roundedMoney(total - amount);
   return <article className="card">
     <div className="card-top">
       <span className="asset-icon" aria-hidden="true">{symbols[entry.type]}</span>
@@ -37,13 +45,13 @@ function Result({ entry, amount, open }) {
     <div className="asset-heading"><span className="eyebrow">{entry.type} · {entry.symbol}{entry.sector && ` · ${entry.sector}`}</span><h3>{entry.name}</h3><p>{entry.platform}</p></div>
     <div className="card-value">
       {entry.reason ? <div className="unavailable"><strong>Fuera del alcance del ejemplo</strong><p>{entry.reason}</p></div> :
-        <><span>{entry.totals.length === 3 ? 'Escenario base' : 'Saldo estimado'}</span>
-          <div><strong>{usd.format(main)}</strong><small className={change < -0.005 ? 'negative' : 'positive'}>{change >= .005 ? '+' : ''}{usd.format(change)}</small></div>
-          {entry.totals.length === 3 && <p className="range">Baja / suba · {usd.format(entry.totals[0])} / {usd.format(entry.totals[2])}</p>}
+        <><span>{variable ? 'Resultado en el escenario base' : 'Resultado de la simulación'}</span>
+          <div><strong className={change < 0 ? 'negative' : ''}>{signedUsd.format(change)}</strong><small>Saldo final {usd.format(total)}</small></div>
+          {variable && <ScenarioMiniChart totals={entry.totals} amount={amount} />}
         </>}
     </div>
     <p className="why">{entry.match && <span className="match">Afín a tu objetivo · </span>}{entry.why}</p>
-    {entry.steps && <button className="card-link" onClick={() => open(entry.id)}>Cómo invertir <span aria-hidden="true">↗</span></button>}
+    {entry.steps && <button className="card-link" onClick={() => open(entry.id)}>Ver simulación y cómo invertir <span aria-hidden="true">↗</span></button>}
   </article>;
 }
 
@@ -63,44 +71,130 @@ function fieldsFor(entry) {
   return fields;
 }
 
-function Detail({ entry, values, amount, apply, close }) {
+function BreakEven({ entry, amount }) {
+  if (entry.breakEven === undefined) return null;
+  if (entry.exitBreakEvenPrice < 0) return <div className="detail-break-even">
+    <h4>Punto de equilibrio</h4>
+    <p>Los cobros previstos y el saldo sin invertir ya cubren el capital inicial en este ejemplo.</p>
+  </div>;
+  const threshold = percent.format(Math.abs(entry.breakEven) / 100);
+  let explanation = 'Recuperás el capital si el precio se mantiene.';
+  if (entry.breakEven > 0.000001) explanation = `El precio tiene que subir ${threshold} para que recuperes ${usd.format(amount)}.`;
+  if (entry.breakEven < -0.000001) explanation = `El precio puede bajar hasta ${threshold} y todavía recuperarías ${usd.format(amount)}.`;
+  const quotePrice = entry.exitBreakEvenPrice > 0 && entry.quoteCurrency
+    ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: entry.quoteCurrency, currencyDisplay: 'code', maximumFractionDigits: 2 }).format(entry.exitBreakEvenPrice)
+    : null;
+
+  return <div className="detail-break-even">
+    <h4>Punto de equilibrio</h4>
+    <p>{explanation}{quotePrice && ` Precio de venta de equilibrio: ${quotePrice}${entry.quote ? ` ${entry.quote}` : ' por unidad'}.`}</p>
+    <p>Con los costos, el tipo de cambio y los cobros incluidos en esta simulación.</p>
+  </div>;
+}
+
+function Outcome({ entry, amount, scenario, onSelect }) {
+  if (!entry.totals) return <p className="notice">{entry.reason}</p>;
+
+  const variable = entry.totals.length === 3;
+  const index = variable ? scenario : 0;
+  const net = roundedMoney(entry.totals[index] - amount);
+  const breakdown = entry.breakdown?.[index];
+  const proceedsLabel = { trade: 'Venta neta', fund: 'Rescate neto', fixed: 'Capital al vencimiento', bill: 'Capital recuperado' }[entry.model];
+  const flowLabel = ['fixed', 'bill'].includes(entry.model) ? 'Interés o rendimiento' : 'Cobros del período';
+
+  return <section className="detail-section" aria-labelledby="outcome-title">
+    <h3 id="outcome-title">¿Cuánto ganarías o perderías?</h3>
+    <dl className="detail-kpis" aria-live="polite">
+      <div><dt>{net < 0 ? 'Pérdida estimada' : net > 0 ? 'Ganancia estimada' : 'Resultado estimado'}</dt>
+        <dd className={net < 0 ? 'negative' : ''}>{signedUsd.format(net)}</dd></div>
+      <div><dt>Saldo final</dt><dd>{usd.format(entry.totals[index])}</dd></div>
+      <div><dt>Retorno sobre el capital inicial</dt><dd>{percent.format((entry.totals[index] - amount) / amount)}</dd></div>
+    </dl>
+    <ScenarioChart entry={entry} amount={amount} selectedIndex={index} onSelect={onSelect} />
+    <BreakEven entry={entry} amount={amount} />
+    {breakdown && <div>
+      <h4>De dónde sale el resultado</h4>
+      <dl className="detail-ledger">
+        <div><dt>{proceedsLabel}{breakdown.exitCosts > 0 && ` (después de ${usd.format(breakdown.exitCosts)} de costos de salida)`}</dt><dd>{usd.format(breakdown.proceeds)}</dd></div>
+        {breakdown.flows > 0 && <div><dt>+ {flowLabel}</dt><dd>{usd.format(breakdown.flows)}</dd></div>}
+        {breakdown.leftover > 0 && <div><dt>+ Saldo que quedó sin invertir</dt><dd>{usd.format(breakdown.leftover)}</dd></div>}
+        <div><dt>− Capital inicial</dt><dd>{usd.format(amount)}</dd></div>
+        <div><dt>= Ganancia o pérdida</dt><dd className={net < 0 ? 'negative' : ''}>{signedUsd.format(net)}</dd></div>
+      </dl>
+    </div>}
+  </section>;
+}
+
+function returnExplanation(entry) {
+  if (entry.model === 'fixed') return 'El banco te devuelve el capital y te paga intereses según la tasa y el plazo.';
+  if (entry.model === 'bill') return 'Comprás la letra a descuento y cobrás el valor nominal al vencimiento. La diferencia es el rendimiento antes de gastos.';
+  if (entry.model === 'fund') return 'Si el valor de tus cuotapartes sube, podés rescatar por un importe mayor. El resultado depende del valor al rescate y los cargos.';
+  if (entry.quote) return 'Podés cobrar cupones o amortizaciones y obtener una ganancia o pérdida al vender. El resultado incluye los cobros ingresados para el período.';
+  if (entry.type === 'Cripto') return 'Ganás si al vender cobrás más de lo que pagaste, incluidas las comisiones y la diferencia entre los precios de compra y venta.';
+  return 'Ganás si al vender cobrás más de lo que pagaste, después de las comisiones. Esta simulación de precio deja los dividendos fuera del cálculo.';
+}
+
+function Detail({ entry, values, amount, days, apply, close, pending, error }) {
   const [draft, setDraft] = useState(values);
-  const isVariable = entry.totals?.length === 3;
+  const [scenario, setScenario] = useState(1);
   const update = (key, value) => setDraft(previous => ({ ...previous, [key]: value }));
+  const purchaseDetails = entry.invested !== undefined || entry.units !== undefined || entry.nominal !== undefined;
   return <div className="overlay" onClick={event => { if (event.target === event.currentTarget) close(); }}>
     <dialog ref={element => { if (element && !element.open) element.showModal(); }} onCancel={event => { event.preventDefault(); close(); }} onClick={event => { if (event.target === event.currentTarget) close(); }} aria-labelledby="detail-title">
       <div className="dialog-content">
-        <header className="dialog-head"><div><span className="eyebrow">{entry.type} · {entry.platform}</span><h2 id="detail-title">{entry.name}</h2></div><button className="close" aria-label="Cerrar" onClick={close}>×</button></header>
-        <h3>Por qué podría convenirte</h3><p>{entry.why} {entry.tradeoff}</p>
-        {entry.requirement && <p className="notice">{entry.requirement}</p>}
-        <h3>Cómo hacer la inversión</h3><ol>{entry.steps.map(step => <li key={step}>{step}</li>)}</ol>
-        <div className="sources">
-          <a href={entry.source[1]} target="_blank" rel="noreferrer">{entry.source[0]} ↗</a>
-          {entry.registry && <a href={entry.registry} target="_blank" rel="noreferrer">Consultar agentes en CNV ↗</a>}
-        </div>
-        {entry.totals && <dl className="metrics">
-          {entry.invested !== undefined && <div><dt>Capital invertido</dt><dd>{usd.format(entry.invested)}</dd></div>}
-          {entry.leftover !== undefined && <div><dt>Saldo sin invertir</dt><dd>{usd.format(entry.leftover)}</dd></div>}
-          {entry.units !== undefined && <div><dt>{entry.quote ? 'Nominales' : 'Unidades'}</dt><dd>{number.format(entry.units)}</dd></div>}
-          {entry.nominal !== undefined && <div><dt>Valor nominal</dt><dd>{usd.format(entry.nominal)}</dd></div>}
-          <div><dt>Costos con precio sin cambios</dt><dd>{usd.format(entry.costs)}</dd></div>
-          {entry.breakEven !== undefined && <div><dt>Variación del precio para recuperar {usd.format(amount)}</dt><dd>{number.format(Math.round(entry.breakEven * 100) / 100)} %</dd></div>}
-        </dl>}
-        {isVariable && <p className="notice">Ganancia o pérdida en el escenario base: <strong>{usd.format(entry.totals[1] - amount)}</strong>. El saldo incluye el efectivo que quedó sin invertir.</p>}
+        <header className="dialog-head">
+          <div>
+            <span className="eyebrow">{entry.type} · {entry.symbol} · {entry.platform}</span>
+            <h2 id="detail-title">{entry.name}</h2>
+            <p className="detail-context">{usd.format(amount)} de capital inicial · {days} días · Antes de impuestos</p>
+          </div>
+          <button className="close" autoFocus aria-label="Cerrar" onClick={close}>×</button>
+        </header>
+        {pending && <p role="status">Actualizando la simulación…</p>}
+        {error && <p className="error" role="alert">{error}</p>}
+        <Outcome entry={entry} amount={amount} scenario={scenario} onSelect={setScenario} />
+        <section className="detail-section">
+          <h3>Cómo se gana o se pierde</h3>
+          <p>{returnExplanation(entry)}</p>
+          {entry.breakdown && entry.model === 'trade' && <p>Con un precio de venta igual al de compra, los costos pueden dejarte en pérdida. {entry.fx && 'Si cambia el tipo de cambio, también cambia cuánto te queda en USD.'}</p>}
+          {purchaseDetails && <dl className="metrics">
+            {entry.invested !== undefined && <div><dt>Importe de compra sin comisiones</dt><dd>{usd.format(entry.invested)}</dd></div>}
+            {entry.units !== undefined && <div><dt>{entry.quote ? 'Nominales' : 'Unidades compradas'}</dt><dd>{number.format(entry.units)}</dd></div>}
+            {entry.nominal !== undefined && <div><dt>Valor nominal</dt><dd>{usd.format(entry.nominal)}</dd></div>}
+            <div><dt>{entry.entryCosts !== undefined ? 'Costos al entrar' : 'Costo de transferencia'}</dt><dd>{usd.format(entry.entryCosts ?? entry.costs)}</dd></div>
+          </dl>}
+        </section>
         <details open={Boolean(entry.reason)}>
           <summary>Editar supuestos</summary>
-          <p>Ingresá las condiciones de tu plataforma. Con precio en USD usá 1 en ambos tipos de cambio. Los escenarios son variaciones para todo el período elegido.</p>
-          <form className="assumptions" onSubmit={event => { event.preventDefault(); apply(draft); }}>
+          <p>Usá las condiciones de tu plataforma. {entry.fx && 'Con precio en USD usá 1 en ambos tipos de cambio. '}{entry.scenarios && 'Cada variación se aplica al período completo.'}</p>
+          <form className="assumptions" onSubmit={event => {
+            event.preventDefault();
+            apply(draft);
+            event.currentTarget.closest('dialog').scrollTop = 0;
+          }}>
             {fieldsFor(entry).map(({ label, name, value, min, max }) =>
               <label key={name}>{label}<input type="number" step="any" required min={min} max={max} value={draft[name] ?? value} onChange={event => update(name, event.target.value)} /></label>)}
-            {entry.scenarios?.map((scenario, index) => <label key={index}>{['Baja (%)', 'Base (%)', 'Suba (%)'][index]}
+            {entry.scenarios?.map((scenario, index) => <label key={index}>{['Variación en el escenario bajo (%)', 'Variación en el escenario base (%)', 'Variación en el escenario alto (%)'][index]}
               <input type="number" step="any" required min="-100" max="1000" value={(draft.scenarios ?? entry.scenarios)[index]} onChange={event => {
                 const scenarios = [...(draft.scenarios ?? entry.scenarios)];
                 scenarios[index] = event.target.value;
                 update('scenarios', scenarios);
               }} /></label>)}
-            <button className="primary" type="submit">Aplicar y simular</button>
+            <button className="primary" type="submit" disabled={pending}>Aplicar y simular</button>
           </form>
+        </details>
+        <section className="detail-section">
+          <h3>Por qué podría convenirte</h3>
+          <p>{entry.why} {entry.tradeoff}</p>
+        </section>
+        <details className="detail-guide">
+          <summary>Cómo hacer la inversión</summary>
+          {entry.requirement && <p className="notice">{entry.requirement}</p>}
+          <ol>{entry.steps.map(step => <li key={step}>{step}</li>)}</ol>
+          <div className="sources">
+            <a href={entry.source[1]} target="_blank" rel="noreferrer">{entry.source[0]} ↗</a>
+            {entry.registry && <a href={entry.registry} target="_blank" rel="noreferrer">Consultar agentes en CNV ↗</a>}
+          </div>
         </details>
       </div>
     </dialog>
@@ -188,10 +282,9 @@ function App() {
       </section>
     </main>
     <footer className="wrap">MyInvestor · Simulación educativa</footer>
-    {detail && <Detail key={detail.id} entry={detail} values={request.assumptions[detail.id] ?? {}} amount={output.amount} close={() => setActive(null)} apply={values => {
+    {detail && <Detail key={detail.id} entry={detail} values={request.assumptions[detail.id] ?? {}} amount={output.amount} days={output.days} pending={pending} error={error} close={() => setActive(null)} apply={values => {
       const numeric = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, Array.isArray(value) ? value.map(Number) : Number(value)]));
       setRequest(previous => ({ ...previous, assumptions: { ...previous.assumptions, [detail.id]: numeric } }));
-      setActive(null);
     }} />}
   </>;
 }

@@ -21,11 +21,18 @@ function calculate(entry, budget, days, params) {
   if (['fixed', 'bill'].includes(entry.model)) {
     const rate = number(params.annualRate, entry.annualRate, 0, 100) / 100;
     const factor = 1 + rate * days / 365;
-    if (entry.model === 'fixed') return { totals: [funds * factor], costs: transfer, invested: funds };
+    if (entry.model === 'fixed') return {
+      totals: [funds * factor], costs: transfer, invested: funds,
+      breakdown: [{ proceeds: funds, flows: funds * (factor - 1), leftover: 0 }]
+    };
     const nominal = Math.floor((funds * factor + 1e-9) / 100) * 100;
     const invested = nominal / factor;
     if (nominal < Math.max(100, minimum)) return { reason: 'El saldo no alcanza para la letra del ejemplo.' };
-    return { totals: [funds - invested + nominal], costs: transfer, invested, leftover: funds - invested, nominal };
+    const leftover = funds - invested;
+    return {
+      totals: [leftover + nominal], costs: transfer, invested, leftover, nominal,
+      breakdown: [{ proceeds: invested, flows: nominal - invested, leftover }]
+    };
   }
 
   const fee = number(params.fee, entry.fee, 0, 50) / 100;
@@ -37,7 +44,14 @@ function calculate(entry, budget, days, params) {
   const returns = scenarios.map(value => number(value, 0, -100, 1000) / 100);
   if (entry.model === 'fund') {
     const invested = funds / (1 + fee);
-    return { totals: returns.map(change => invested * (1 + change) * (1 - fee)), invested, costs: transfer + invested * fee * 2 };
+    const breakdown = returns.map(change => {
+      const gross = invested * (1 + change);
+      return { proceeds: gross * (1 - fee), flows: 0, leftover: 0, exitCosts: gross * fee };
+    });
+    return {
+      totals: breakdown.map(item => item.proceeds), appliedScenarios: scenarios, breakdown, invested,
+      entryCosts: transfer + invested * fee, costs: transfer + invested * fee * 2
+    };
   }
 
   const price = number(params.price, entry.price, 0.00000001, 1e8);
@@ -51,13 +65,22 @@ function calculate(entry, budget, days, params) {
   if (!units || units * purchaseUSD + 1e-9 < minimum) return { reason: 'El saldo no alcanza para la unidad o el mínimo de compra ingresado.' };
   const invested = units * purchaseUSD;
   const leftover = Math.max(0, funds - invested * (1 + fee));
-  const exit = units * price / fxOut * (1 - spread) * (1 - fee);
+  const grossExit = units * price / fxOut;
+  const exitFactor = (1 - spread) * (1 - fee);
   const flows = cashFlow * units;
+  const entryCosts = transfer + invested * fee;
+  const breakEvenFactor = (budget - leftover - flows) / (grossExit * exitFactor);
+  const breakdown = returns.map(change => {
+    const gross = grossExit * (1 + change);
+    return { proceeds: gross * exitFactor, flows, leftover, exitCosts: gross * (1 - exitFactor) };
+  });
   return {
-    totals: returns.map(change => leftover + exit * (1 + change) + flows),
-    costs: transfer + invested * fee + units * price / fxOut * (spread + (1 - spread) * fee),
+    totals: breakdown.map(({ proceeds, flows, leftover }) => proceeds + flows + leftover),
+    appliedScenarios: scenarios, breakdown, entryCosts,
+    costs: entryCosts + grossExit * (1 - exitFactor),
     invested, leftover, units: entry.quote ? units * 100 : units,
-    breakEven: ((budget - leftover - flows) / exit - 1) * 100
+    breakEven: (breakEvenFactor - 1) * 100,
+    exitBreakEvenPrice: price * breakEvenFactor
   };
 }
 

@@ -33,3 +33,18 @@ test('valida país, plazo y orden de escenarios', () => {
   assert.throws(() => run('US', { days: 1.2 }));
   assert.throws(() => run('US', { assumptions: { voo: { scenarios: [20, 0, 10] } } }));
 });
+
+test('expone el desglose de cada escenario y el precio de equilibrio', () => {
+  const assumptions = { bbar: { scenarios: [-10, 0, 20], fxIn: 1500, fxOut: 1800 } };
+  const result = run('AR', { assumptions }).find(entry => entry.id === 'bbar');
+  assert.deepEqual(result.appliedScenarios, [-10, 0, 20]);
+  assert.ok(result.breakdown[2].exitCosts > result.breakdown[0].exitCosts);
+  for (const [index, { proceeds, flows, leftover }] of result.breakdown.entries()) {
+    assert.equal(proceeds + flows + leftover, result.totals[index]);
+  }
+  const breakEven = result.breakEven;
+  const atBreakEven = run('AR', { assumptions: {
+    bbar: { ...assumptions.bbar, scenarios: [-10, breakEven, breakEven] }
+  } }).find(entry => entry.id === 'bbar');
+  assert.equal(atBreakEven.totals[1].toFixed(2), '100.00');
+});
