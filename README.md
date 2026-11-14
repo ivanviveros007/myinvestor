@@ -33,3 +33,12 @@ La API expone `GET /health` y `POST /api/simulate`. El cuerpo requiere `country`
 4. Si necesitás acceso remoto, configurá una entrada HTTPS propia para MyInvestor que apunte a su puerto local. Podés servir la aplicación desde la raíz de esa URL. Lexy sirve como referencia para instalar el servicio de macOS.
 
 Los logs del LaunchAgent se guardan en `~/Library/Logs/MyInvestor`. El servicio arranca con la sesión de usuario, al igual que el despliegue de referencia de Lexy.
+
+## Cotizaciones de acciones
+
+Copiá `.env.example` a `.env` en la raíz y completá solo el proveedor que tengas. `.env` está excluido de Git. Reiniciá `npm start` o `npm run dev:api` después de cambiarlo.
+
+- Argentina usa las credenciales de una cuenta comitente activa en [IOL](https://developers.iolinversiones.com/docs/quickstart/first-quote).
+- Estados Unidos usa las claves de una cuenta de [Alpaca](https://docs.alpaca.markets/us/docs/about-market-data-api), que pueden provenir del entorno Paper. La fuente de cotización es IEX.
+
+El servidor consulta precios por REST y guarda las respuestas durante 30 segundos. Las fichas permiten aplicar el último precio disponible como referencia. IOL muestra la hora de consulta y Alpaca la del último negocio del feed IEX. El servidor usa las credenciales para autenticarse y consultar datos de mercado. Mantené las claves en el servidor. Para un despliegue con `launchd`, configurá las variables en el entorno del servicio o usá un archivo `.env` local al checkout.

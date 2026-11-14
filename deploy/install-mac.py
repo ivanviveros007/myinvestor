@@ -26,7 +26,7 @@ logs.mkdir(parents=True, exist_ok=True)
 plist = agents / f"{label}.plist"
 config = plistlib.dumps({
     "Label": label,
-    "ProgramArguments": [node, str(root / "apps/api/server.js")],
+    "ProgramArguments": [node, "--env-file-if-exists=.env", str(root / "apps/api/server.js")],
     "WorkingDirectory": str(root),
     "EnvironmentVariables": {"PORT": str(port)},
     "RunAtLoad": True,

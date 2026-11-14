@@ -243,3 +243,23 @@ button.scenario-row:hover { border-color: #777; }
 .detail-ledger dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
 .detail-guide { border-top: 1px solid var(--border); padding-top: 8px; }
 .detail-guide .sources { margin-top: 10px; }
+
+.market-quote .quote-price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 24px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.quote-price small { font-size: 13px; }
+.quote-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.quote-refresh {
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 12px;
+  background: white;
+  color: var(--ink);
+}

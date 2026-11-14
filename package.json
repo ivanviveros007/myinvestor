@@ -6,9 +6,9 @@
   "engines": {"node": ">=22.12.0"},
   "scripts": {
     "dev": "npm run dev -w web",
-    "dev:api": "node --watch apps/api/server.js",
+    "dev:api": "node --env-file-if-exists=.env --watch apps/api/server.js",
     "build": "npm run build -w web",
-    "start": "node apps/api/server.js",
+    "start": "node --env-file-if-exists=.env apps/api/server.js",
     "test": "node --test"
   }
 }

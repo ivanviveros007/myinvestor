@@ -1,3 +1,4 @@
+import { MarketQuote } from './MarketQuote.jsx';
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ScenarioChart, ScenarioMiniChart } from './ScenarioChart.jsx';
@@ -134,7 +135,7 @@ function returnExplanation(entry) {
   return 'Ganás si al vender cobrás más de lo que pagaste, después de las comisiones. Esta simulación de precio deja los dividendos fuera del cálculo.';
 }
 
-function Detail({ entry, values, amount, days, apply, close, pending, error }) {
+function Detail({ entry, country, values, amount, days, apply, close, pending, error }) {
   const [draft, setDraft] = useState(values);
   const [scenario, setScenario] = useState(1);
   const update = (key, value) => setDraft(previous => ({ ...previous, [key]: value }));
@@ -152,6 +153,11 @@ function Detail({ entry, values, amount, days, apply, close, pending, error }) {
         </header>
         {pending && <p role="status">Actualizando la simulación…</p>}
         {error && <p className="error" role="alert">{error}</p>}
+        {entry.type === 'Acción' && <MarketQuote country={country} id={entry.id} pending={pending}
+          appliedPrice={error ? undefined : values.price} applyPrice={price => {
+            setDraft(previous => ({ ...previous, price }));
+            apply({ ...values, price });
+          }} />}
         <Outcome entry={entry} amount={amount} scenario={scenario} onSelect={setScenario} />
         <section className="detail-section">
           <h3>Cómo se gana o se pierde</h3>
@@ -282,7 +288,7 @@ function App() {
       </section>
     </main>
     <footer className="wrap">MyInvestor · Simulación educativa</footer>
-    {detail && <Detail key={detail.id} entry={detail} values={request.assumptions[detail.id] ?? {}} amount={output.amount} days={output.days} pending={pending} error={error} close={() => setActive(null)} apply={values => {
+    {detail && <Detail key={detail.id} entry={detail} country={output.country} values={request.assumptions[detail.id] ?? {}} amount={output.amount} days={output.days} pending={pending} error={error} close={() => setActive(null)} apply={values => {
       const numeric = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, Array.isArray(value) ? value.map(Number) : Number(value)]));
       setRequest(previous => ({ ...previous, assumptions: { ...previous.assumptions, [detail.id]: numeric } }));
     }} />}
