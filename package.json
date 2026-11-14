@@ -1,0 +1,14 @@
+{
+  "name": "myinvestor",
+  "private": true,
+  "type": "module",
+  "workspaces": ["apps/*"],
+  "engines": {"node": ">=22.12.0"},
+  "scripts": {
+    "dev": "npm run dev -w web",
+    "dev:api": "node --watch apps/api/server.js",
+    "build": "npm run build -w web",
+    "start": "node apps/api/server.js",
+    "test": "node --test"
+  }
+}
