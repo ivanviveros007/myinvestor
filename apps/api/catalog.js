@@ -1,3 +1,5 @@
+import { additionalStocks } from './stocks.js';
+
 const cnv = 'https://www.cnv.gov.ar/sitioWeb/RegistrosPublicos/Agentes';
 const byma = 'https://www.byma.com.ar/productos/productos-financieros/';
 const ibkr = 'https://www.interactivebrokers.com/support/faq/content/products-trade-fractions-83257314';
@@ -21,7 +23,7 @@ const options = {
       steps: ['Elegí un agente habilitado en el registro de la CNV y abrí una cuenta comitente.', 'Transferí desde una cuenta a tu nombre. Verificá si tu agente ofrece la especie en USD o si vas a operar en pesos.', 'Buscá SPY y revisá especie, precio y cantidad. Para salir, ingresá una venta y retirás el saldo una vez liquidado.']
     },
     {
-      id: 'ggal', type: 'Acción', symbol: 'GGAL', name: 'Grupo Financiero Galicia', platform: 'Agente registrado en CNV', risk: 'Alto',
+      id: 'ggal', sector: 'Finanzas', quoteCurrency: 'ARS', type: 'Acción', symbol: 'GGAL', name: 'Grupo Financiero Galicia', platform: 'Agente registrado en CNV', risk: 'Alto',
       why: 'Puede encajar si buscás exposición directa a una empresa argentina y aceptás el riesgo de concentrarte en ella.',
       tradeoff: 'El precio de la acción puede bajar y la conversión puede cambiar el resultado en USD.',
       model: 'trade', price: 7000, fxIn: 1500, fxOut: 1500, step: 1, fee: 0.7, scenarios: [-20, 0, 15], fx: true,
@@ -72,7 +74,7 @@ const options = {
       steps: ['Solicitá una cuenta declarando tu residencia real y verificá los permisos de negociación.', 'En el portal, elegí Transfer & Pay y seguí las instrucciones para depositar desde una cuenta a tu nombre.', 'Buscá VOO, verificá si admite una orden por monto y revisá el costo. Para salir, vendé la posición y solicitá un retiro.']
     },
     {
-      id: 'aapl', type: 'Acción', symbol: 'AAPL', name: 'Acción de Apple', platform: 'Interactive Brokers', risk: 'Alto',
+      id: 'aapl', sector: 'Tecnología', quoteCurrency: 'USD', type: 'Acción', symbol: 'AAPL', name: 'Acción de Apple', platform: 'Interactive Brokers', risk: 'Alto',
       why: 'Puede encajar si querés invertir en una empresa específica y aceptás depender de su desempeño.',
       tradeoff: 'Una sola empresa concentra el riesgo. Confirmá la disponibilidad de fracciones.',
       model: 'trade', price: 225, step: 0.0001, minimum: 1, fee: 0.5, scenarios: [-20, 0, 15],
@@ -95,5 +97,5 @@ export const catalog = Object.fromEntries(Object.entries(options).map(([country,
   { id: 'cash', type: 'Referencia', symbol: 'USD', name: 'Conservar los dólares', platform: 'Tu cuenta bancaria', risk: 'Referencia',
     why: 'Puede encajar si necesitás disponer del dinero pronto y querés una referencia para comparar.',
     tradeoff: 'El saldo nominal se mantiene en este ejemplo. Su poder de compra puede cambiar.', model: 'cash' },
-  ...entries.map(entry => ({ ...entry, registry: country === 'AR' && ['Bono', 'ETF', 'Acción'].includes(entry.type) ? cnv : undefined }))
+  ...[...entries, ...additionalStocks(country)].map(entry => ({ ...entry, registry: country === 'AR' && ['Bono', 'ETF', 'Acción'].includes(entry.type) ? cnv : undefined }))
 ]]));

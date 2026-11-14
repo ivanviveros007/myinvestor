@@ -34,7 +34,7 @@ function Result({ entry, amount, open }) {
       <span className="asset-icon" aria-hidden="true">{symbols[entry.type]}</span>
       <span className={`risk ${entry.risk.toLowerCase()}`}>{entry.risk === 'Referencia' ? 'Referencia' : `Riesgo ${entry.risk.toLowerCase()}`}</span>
     </div>
-    <div className="asset-heading"><span className="eyebrow">{entry.type} · {entry.symbol}</span><h3>{entry.name}</h3><p>{entry.platform}</p></div>
+    <div className="asset-heading"><span className="eyebrow">{entry.type} · {entry.symbol}{entry.sector && ` · ${entry.sector}`}</span><h3>{entry.name}</h3><p>{entry.platform}</p></div>
     <div className="card-value">
       {entry.reason ? <div className="unavailable"><strong>Fuera del alcance del ejemplo</strong><p>{entry.reason}</p></div> :
         <><span>{entry.totals.length === 3 ? 'Escenario base' : 'Saldo estimado'}</span>
@@ -55,7 +55,7 @@ function fieldsFor(entry) {
   const fields = [field('Costo de fondeo o transferencia (USD)', 'transfer', 0, 0, 1e8)];
   if (entry.minimum !== undefined) fields.push(field('Mínimo del ejemplo (USD)', 'minimum', entry.minimum, 0, 1e8));
   if (entry.annualRate !== undefined) fields.push(field('Tasa anual del ejemplo (%)', 'annualRate', entry.annualRate, 0, 100));
-  if (entry.price !== undefined) fields.push(field(`Precio de compra ${entry.quote ?? 'por unidad'}`, 'price', entry.price, 0.00000001, 1e8));
+  if (entry.price !== undefined) fields.push(field(`Precio de compra ${entry.quote ?? 'por unidad'}${entry.quoteCurrency ? ` (${entry.quoteCurrency})` : ''}`, 'price', entry.price, 0.00000001, 1e8));
   if (entry.fee !== undefined) fields.push(field('Comisión por operación (%)', 'fee', entry.fee, 0, 50));
   if (entry.model === 'trade') fields.push(field('Descuento sobre el precio de venta (%)', 'spread', 0, 0, 99));
   if (entry.fx) fields.push(field('Moneda local por USD al comprar', 'fxIn', entry.fxIn ?? 1, 0.000001, 1e8), field('Moneda local por USD al vender', 'fxOut', entry.fxOut ?? 1, 0.000001, 1e8));
@@ -114,6 +114,8 @@ function App() {
   const [request, setRequest] = useState({ form: initial, assumptions: {} });
   const [output, setOutput] = useState(null);
   const [filter, setFilter] = useState('Todas');
+  const [sector, setSector] = useState('');
+  const [query, setQuery] = useState('');
   const [active, setActive] = useState(null);
   const [error, setError] = useState('');
   const [pending, setPending] = useState(true);
@@ -141,13 +143,23 @@ function App() {
     setForm(next);
     if (key === 'country') {
       setFilter('Todas');
+      setSector('');
+      setQuery('');
       setActive(null);
       setRequest(previous => ({ ...previous, form: { ...previous.form, country: value } }));
     }
   }
 
   const categories = ['Todas', ...new Set(output?.results.map(entry => entry.type))];
-  const entries = output?.results.filter(entry => filter === 'Todas' || filter === entry.type);
+  const stocks = filter === 'Acción';
+  const sectors = [...new Set(output?.results.map(entry => entry.sector).filter(Boolean))].sort();
+  const entries = output?.results.filter(entry => {
+    if (filter !== 'Todas' && entry.type !== filter) return false;
+    if (!stocks) return true;
+    const search = query.trim().toLocaleLowerCase('es-AR');
+    return (!sector || entry.sector === sector)
+      && `${entry.symbol} ${entry.name}`.toLocaleLowerCase('es-AR').includes(search);
+  });
   const detail = output?.results.find(entry => entry.id === active);
   return <>
     <header className="site-header"><div className="wrap header-inner"><a href="./" className="logo"><span aria-hidden="true">↗</span> MyInvestor</a><span className="header-label">Simulador de inversiones</span></div></header>
@@ -163,6 +175,15 @@ function App() {
         {error && <p className="error" role="alert">{error}</p>}
         {pending && !output && <p role="status">Calculando simulación…</p>}
         {output && <><div className="filters" aria-label="Categorías">{categories.map(category => <button key={category} aria-pressed={filter === category} onClick={() => setFilter(category)}>{category}</button>)}</div>
+          {stocks && <div className="stock-filters">
+            <label>Buscar por empresa o símbolo<input type="search" value={query} placeholder="Ej. YPF o Microsoft" onChange={event => setQuery(event.target.value)} /></label>
+            <label>Sector<select value={sector} onChange={event => setSector(event.target.value)}>
+              <option value="">Todos los sectores</option>
+              {sectors.map(name => <option key={name}>{name}</option>)}
+            </select></label>
+            <p role="status">{entries.length} {entries.length === 1 ? 'acción' : 'acciones'}</p>
+          </div>}
+          {entries.length === 0 && <p className="notice">No hay acciones que coincidan con esos filtros.</p>}
           <div className="grid">{entries.map(entry => <Result key={entry.id} entry={entry} amount={output.amount} open={setActive} />)}</div></>}
       </section>
     </main>
