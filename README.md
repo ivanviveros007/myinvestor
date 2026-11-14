@@ -30,6 +30,6 @@ La API expone `GET /health` y `POST /api/simulate`. El cuerpo requiere `country`
 1. Cloná con `git clone git@github-work:ivanviveros007/myinvestor.git` usando el alias configurado en esa Mac. Corré `npm ci`, `npm test` y `npm run build` en el checkout.
 2. Verificá que el puerto 3003 esté libre para la primera instalación. Ejecutá `python3 deploy/install-mac.py` con la sesión del usuario iniciada. Se puede definir `PORT` antes de ejecutar el script.
 3. Confirmá `curl -f http://127.0.0.1:3003/health` y que sirva el HTML de la app.
-4. Respaldá el gateway activo de Lexy y añadí la ruta `/myinvestor/*` al puerto de MyInvestor. El gateway tiene que quitar el prefijo antes de reenviar. Hacé que `/myinvestor` redirija a `/myinvestor/` para resolver los assets relativos. Reiniciá el gateway y verificá el HTML, la API y los health checks de Lexy, Hay Examen y MyFitnessCoach. Si falla alguno, restaurá el gateway respaldado y reinicialo.
+4. Si necesitás acceso remoto, configurá una entrada HTTPS propia para MyInvestor que apunte a su puerto local. Podés servir la aplicación desde la raíz de esa URL. Lexy sirve como referencia para instalar el servicio de macOS.
 
 Los logs del LaunchAgent se guardan en `~/Library/Logs/MyInvestor`. El servicio arranca con la sesión de usuario, al igual que el despliegue de referencia de Lexy.
