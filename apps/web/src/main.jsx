@@ -1,5 +1,5 @@
 import { MarketQuote } from './MarketQuote.jsx';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ScenarioChart, ScenarioMiniChart } from './ScenarioChart.jsx';
 import './style.css';
@@ -16,7 +16,7 @@ const goals = { explore: 'Explorar opciones', liquidity: 'Disponer del dinero pr
 const countries = { AR: 'Argentina', US: 'Estados Unidos' };
 const symbols = { Referencia: '＝', 'Plazo fijo': '◴', Bono: '▤', ETF: '◫', Fondo: '◈', Acción: '↗', Cripto: '₿' };
 
-function Controls({ values, update, submit }) {
+function Controls({ values, update, submit, pending }) {
   return <form className="controls" onSubmit={submit}>
     <fieldset>
       <legend>¿Dónde está tu dinero?</legend>
@@ -30,7 +30,7 @@ function Controls({ values, update, submit }) {
     <label>Tu objetivo<select value={values.goal} onChange={event => update('goal', event.target.value)}>
       {Object.entries(goals).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
     </select></label>
-    <button className="primary" type="submit">Simular <span aria-hidden="true">↗</span></button>
+    <button className="primary" type="submit" disabled={pending}>{pending ? 'Simulando…' : 'Simular'} <span aria-hidden="true">↗</span></button>
   </form>;
 }
 
@@ -219,6 +219,8 @@ function App() {
   const [active, setActive] = useState(null);
   const [error, setError] = useState('');
   const [pending, setPending] = useState(true);
+  const resultsHeading = useRef(null);
+  const revealResults = useRef(false);
 
   useEffect(() => {
     const abort = new AbortController();
@@ -237,6 +239,22 @@ function App() {
       .finally(() => { if (!abort.signal.aborted) setPending(false); });
     return () => abort.abort();
   }, [request]);
+
+  useEffect(() => {
+    if (pending || !revealResults.current) return;
+    revealResults.current = false;
+    resultsHeading.current.scrollIntoView({ block: 'start' });
+  }, [pending]);
+
+  function submit(event) {
+    event.preventDefault();
+    revealResults.current = true;
+    setPending(true);
+    setError('');
+    setRequest(previous => ({ ...previous, form }));
+    resultsHeading.current.focus({ preventScroll: true });
+    resultsHeading.current.scrollIntoView({ block: 'start' });
+  }
 
   function update(key, value) {
     const next = { ...form, [key]: value };
@@ -267,14 +285,14 @@ function App() {
       <section className="hero"><div className="wrap">
         <h1>¿Qué podés hacer<br />con tus dólares?</h1>
         <p>Compará alternativas de inversión en Argentina y Estados Unidos y conocé los pasos para operar.</p>
-        <Controls values={form} update={update} submit={event => { event.preventDefault(); setRequest(previous => ({ ...previous, form })); }} />
+        <Controls values={form} update={update} submit={submit} pending={pending} />
       </div></section>
-      <section className="wrap results" aria-busy={pending}>
-        <div className="section-title"><div><h2>Opciones de inversión</h2>{output && <p>{countries[output.country]} · {usd.format(output.amount)} · {output.days} días</p>}</div><span className="sample">Supuestos editables</span></div>
+      <section className="wrap results" aria-labelledby="results-heading">
+        <div className="section-title"><div><h2 id="results-heading" ref={resultsHeading} tabIndex={-1}>Opciones de inversión</h2>{output && !pending && !error && <p role="status">{countries[output.country]} · {usd.format(output.amount)} · {output.days} días</p>}</div><span className="sample">Supuestos editables</span></div>
         <p className="notice">Los precios, tasas y costos iniciales son ilustrativos. Verificá las condiciones vigentes y la elegibilidad con la plataforma. Resultados antes de impuestos.</p>
         {error && <p className="error" role="alert">{error}</p>}
-        {pending && !output && <p role="status">Calculando simulación…</p>}
-        {output && <><div className="filters" aria-label="Categorías">{categories.map(category => <button key={category} aria-pressed={filter === category} onClick={() => setFilter(category)}>{category}</button>)}</div>
+        {pending && <p role="status">Calculando simulación…</p>}
+        {output && (active || (!pending && !error)) && <><div className="filters" aria-label="Categorías">{categories.map(category => <button key={category} aria-pressed={filter === category} onClick={() => setFilter(category)}>{category}</button>)}</div>
           {stocks && <div className="stock-filters">
             <label>Buscar por empresa o símbolo<input type="search" value={query} placeholder="Ej. YPF o Microsoft" onChange={event => setQuery(event.target.value)} /></label>
             <label>Sector<select value={sector} onChange={event => setSector(event.target.value)}>

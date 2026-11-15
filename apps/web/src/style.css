@@ -263,3 +263,6 @@ button.scenario-row:hover { border-color: #777; }
   background: white;
   color: var(--ink);
 }
+
+#results-heading{scroll-margin-top:20px}
+.primary:disabled{cursor:wait;opacity:.65}
