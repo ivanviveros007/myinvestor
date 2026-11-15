@@ -14,7 +14,7 @@ function roundedMoney(value) {
 }
 const goals = { explore: 'Explorar opciones', liquidity: 'Disponer del dinero pronto', date: 'Invertir hasta una fecha', growth: 'Crecer a largo plazo' };
 const countries = { AR: 'Argentina', US: 'Estados Unidos' };
-const symbols = { Referencia: '＝', 'Plazo fijo': '◴', Bono: '▤', ETF: '◫', Fondo: '◈', Acción: '↗', Cripto: '₿' };
+const symbols = { 'Plazo fijo': '◴', Bono: '▤', ETF: '◫', Fondo: '◈', Acción: '↗', Cripto: '₿' };
 
 function Controls({ values, update, submit, pending }) {
   return <form className="controls" onSubmit={submit}>
@@ -41,7 +41,7 @@ function Result({ entry, amount, open }) {
   return <article className="card">
     <div className="card-top">
       <span className="asset-icon" aria-hidden="true">{symbols[entry.type]}</span>
-      <span className={`risk ${entry.risk.toLowerCase()}`}>{entry.risk === 'Referencia' ? 'Referencia' : `Riesgo ${entry.risk.toLowerCase()}`}</span>
+      <span className={`risk ${entry.risk.toLowerCase()}`}>Riesgo {entry.risk.toLowerCase()}</span>
     </div>
     <div className="asset-heading"><span className="eyebrow">{entry.type} · {entry.symbol}{entry.sector && ` · ${entry.sector}`}</span><h3>{entry.name}</h3><p>{entry.platform}</p></div>
     <div className="card-value">
@@ -268,10 +268,11 @@ function App() {
     }
   }
 
-  const categories = ['Todas', ...new Set(output?.results.map(entry => entry.type))];
+  const investments = output?.results.filter(entry => entry.model !== 'cash') ?? [];
+  const categories = ['Todas', ...new Set(investments.map(entry => entry.type))];
   const stocks = filter === 'Acción';
-  const sectors = [...new Set(output?.results.map(entry => entry.sector).filter(Boolean))].sort();
-  const entries = output?.results.filter(entry => {
+  const sectors = [...new Set(investments.map(entry => entry.sector).filter(Boolean))].sort();
+  const entries = investments.filter(entry => {
     if (filter !== 'Todas' && entry.type !== filter) return false;
     if (!stocks) return true;
     const search = query.trim().toLocaleLowerCase('es-AR');
@@ -288,7 +289,7 @@ function App() {
         <Controls values={form} update={update} submit={submit} pending={pending} />
       </div></section>
       <section className="wrap results" aria-labelledby="results-heading">
-        <div className="section-title"><div><h2 id="results-heading" ref={resultsHeading} tabIndex={-1}>Opciones de inversión</h2>{output && !pending && !error && <p role="status">{countries[output.country]} · {usd.format(output.amount)} · {output.days} días</p>}</div><span className="sample">Supuestos editables</span></div>
+        <div className="section-title"><div><h2 id="results-heading" ref={resultsHeading} tabIndex={-1}>Opciones de inversión</h2>{output && !pending && !error && <p role="status">{countries[output.country]} · Capital inicial {usd.format(output.amount)} · {output.days} días</p>}</div><span className="sample">Supuestos editables</span></div>
         <p className="notice">Los precios, tasas y costos iniciales son ilustrativos. Verificá las condiciones vigentes y la elegibilidad con la plataforma. Resultados antes de impuestos.</p>
         {error && <p className="error" role="alert">{error}</p>}
         {pending && <p role="status">Calculando simulación…</p>}
