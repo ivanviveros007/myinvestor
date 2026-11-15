@@ -51,5 +51,6 @@ export function startRadar({ env = process.env, fetchData = fetch } = {}) {
   if (configured) void scan();
   const timer = configured && setInterval(scan, interval * 60000);
   if (timer) timer.unref();
-  return { get: () => snapshot, stop: () => clearInterval(timer) };
+  const instruments = stocks.map(({ id, symbol, name }) => ({ id, symbol, name }));
+  return { get: () => ({ ...snapshot, stocks: instruments }), stop: () => clearInterval(timer) };
 }

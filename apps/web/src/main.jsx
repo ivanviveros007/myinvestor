@@ -1,3 +1,4 @@
+import { PaperPortfolio } from './PaperPortfolio.jsx';
 import { Candles } from './Candles.jsx';
 import { useRadar } from './useRadar.js';
 import { MarketQuote } from './MarketQuote.jsx';
@@ -304,9 +305,9 @@ function App() {
   return <>
     <header className="site-header"><div className="wrap header-inner"><a href="./" className="logo"><span aria-hidden="true">↗</span> MyInvestor</a><div className="header-label">
       <span>Simulador de inversiones</span>
-      <a className={radar.signals.length ? 'radar-alert' : ''} href="#radar">
+      <nav className="header-actions" aria-label="Herramientas"><a className={radar.signals.length ? 'radar-alert' : 'radar-link'} href="#radar">
         {radar.signals.length ? `Radar · ${radar.signals.length} ${radar.signals.length === 1 ? 'señal' : 'señales'} ↓` : 'Radar de acciones ↓'}
-      </a>
+      </a><a className="paper-link" href="#cartera">Cartera de práctica ↓</a></nav>
     </div></div></header>
     <main>
       <section className="hero"><div className="wrap">
@@ -314,6 +315,7 @@ function App() {
         <p>Compará alternativas de inversión en Argentina y Estados Unidos y conocé los pasos para operar.</p>
         <Controls values={form} update={update} submit={submit} pending={pending} />
       </div></section>
+      <PaperPortfolio radar={radar} />
       <Radar radar={radar} open={id => {
         if (form.country !== 'US') update('country', 'US');
         setActive(id);
