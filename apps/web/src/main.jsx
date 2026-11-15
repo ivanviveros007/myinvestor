@@ -1,3 +1,5 @@
+import { Candles } from './Candles.jsx';
+import { useRadar } from './useRadar.js';
 import { MarketQuote } from './MarketQuote.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -135,7 +137,7 @@ function returnExplanation(entry) {
   return 'Ganás si al vender cobrás más de lo que pagaste, después de las comisiones. Esta simulación de precio deja los dividendos fuera del cálculo.';
 }
 
-function Detail({ entry, country, values, amount, days, apply, close, pending, error }) {
+function Detail({ entry, country, candles, values, amount, days, apply, close, pending, error }) {
   const [draft, setDraft] = useState(values);
   const [scenario, setScenario] = useState(1);
   const update = (key, value) => setDraft(previous => ({ ...previous, [key]: value }));
@@ -158,6 +160,7 @@ function Detail({ entry, country, values, amount, days, apply, close, pending, e
             setDraft(previous => ({ ...previous, price }));
             apply({ ...values, price });
           }} />}
+        <Candles candles={candles} />
         <Outcome entry={entry} amount={amount} scenario={scenario} onSelect={setScenario} />
         <section className="detail-section">
           <h3>Cómo se gana o se pierde</h3>
@@ -209,7 +212,25 @@ function Detail({ entry, country, values, amount, days, apply, close, pending, e
 
 const initial = { country: 'AR', amount: '100', days: '90', goal: 'explore' };
 
+function Radar({ radar, open }) {
+  return <section id="radar" className="wrap radar" aria-labelledby="radar-title">
+    <h2 id="radar-title">Radar de acciones</h2>
+    <p>Busca caídas de al menos 5 % entre dos cierres en las acciones de EE. UU. del catálogo. Revisá la empresa y la causa de la caída antes de decidir.</p>
+    {radar.status === 'loading' && <p role="status">Consultando el radar…</p>}
+    {radar.status === 'unconfigured' && <p>Configurá Alpaca para recibir señales y ver las velas del mercado.</p>}
+    {radar.status === 'unavailable' && <p>El radar no pudo consultar el mercado. Volverá a intentar automáticamente.</p>}
+    {radar.status === 'ok' && radar.signals.length === 0 && <p>Sin caídas que alcancen el umbral en los últimos cierres disponibles.</p>}
+    {radar.signals.length > 0 && <ul>{radar.signals.map(signal => <li key={signal.id}>
+      <button type="button" onClick={() => open(signal.id)}>
+        <strong>{signal.name} · {signal.symbol}</strong>
+        <span>{percent.format(signal.change / 100)} entre cierres · {signal.date} · Ver ficha ↗</span>
+      </button>
+    </li>)}</ul>}
+  </section>;
+}
+
 function App() {
+  const radar = useRadar();
   const [form, setForm] = useState(initial);
   const [request, setRequest] = useState({ form: initial, assumptions: {} });
   const [output, setOutput] = useState(null);
@@ -281,13 +302,22 @@ function App() {
   });
   const detail = output?.results.find(entry => entry.id === active);
   return <>
-    <header className="site-header"><div className="wrap header-inner"><a href="./" className="logo"><span aria-hidden="true">↗</span> MyInvestor</a><span className="header-label">Simulador de inversiones</span></div></header>
+    <header className="site-header"><div className="wrap header-inner"><a href="./" className="logo"><span aria-hidden="true">↗</span> MyInvestor</a><div className="header-label">
+      <span>Simulador de inversiones</span>
+      <a className={radar.signals.length ? 'radar-alert' : ''} href="#radar">
+        {radar.signals.length ? `Radar · ${radar.signals.length} ${radar.signals.length === 1 ? 'señal' : 'señales'} ↓` : 'Radar de acciones ↓'}
+      </a>
+    </div></div></header>
     <main>
       <section className="hero"><div className="wrap">
         <h1>¿Qué podés hacer<br />con tus dólares?</h1>
         <p>Compará alternativas de inversión en Argentina y Estados Unidos y conocé los pasos para operar.</p>
         <Controls values={form} update={update} submit={submit} pending={pending} />
       </div></section>
+      <Radar radar={radar} open={id => {
+        if (form.country !== 'US') update('country', 'US');
+        setActive(id);
+      }} />
       <section className="wrap results" aria-labelledby="results-heading">
         <div className="section-title"><div><h2 id="results-heading" ref={resultsHeading} tabIndex={-1}>Opciones de inversión</h2>{output && !pending && !error && <p role="status">{countries[output.country]} · Capital inicial {usd.format(output.amount)} · {output.days} días</p>}</div><span className="sample">Supuestos editables</span></div>
         <p className="notice">Los precios, tasas y costos iniciales son ilustrativos. Verificá las condiciones vigentes y la elegibilidad con la plataforma. Resultados antes de impuestos.</p>
@@ -307,7 +337,7 @@ function App() {
       </section>
     </main>
     <footer className="wrap">MyInvestor · Simulación educativa</footer>
-    {detail && <Detail key={detail.id} entry={detail} country={output.country} values={request.assumptions[detail.id] ?? {}} amount={output.amount} days={output.days} pending={pending} error={error} close={() => setActive(null)} apply={values => {
+    {detail && <Detail key={detail.id} entry={detail} country={output.country} candles={output.country === 'US' ? radar.history[detail.id] : undefined} values={request.assumptions[detail.id] ?? {}} amount={output.amount} days={output.days} pending={pending} error={error} close={() => setActive(null)} apply={values => {
       const numeric = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, Array.isArray(value) ? value.map(Number) : Number(value)]));
       setRequest(previous => ({ ...previous, assumptions: { ...previous.assumptions, [detail.id]: numeric } }));
     }} />}

@@ -17,6 +17,8 @@ const listings = {
     ['JPM', 'JPMorgan Chase', 'Finanzas', 270, 'banca, crédito y servicios financieros', 'morosidad y cambios en tasas'],
     ['KO', 'Coca-Cola', 'Consumo básico', 70, 'bebidas de consumo masivo', 'costos de insumos y cambios en preferencias de consumo'],
     ['XOM', 'Exxon Mobil', 'Energía', 110, 'producción y refinación de petróleo y gas', 'precios del crudo y del gas'],
+    ['RKLB', 'Rocket Lab', 'Industria', 45, 'lanzamientos orbitales y sistemas espaciales', 'retrasos en lanzamientos y ejecución de contratos'],
+    ['IONQ', 'IonQ', 'Tecnología', 40, 'computación y redes cuánticas', 'avance tecnológico y adopción comercial'],
     ['JNJ', 'Johnson & Johnson', 'Salud', 160, 'medicamentos y tecnología médica', 'resultados clínicos y vencimiento de patentes']
   ]
 };

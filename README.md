@@ -42,3 +42,5 @@ Copiá `.env.example` a `.env` en la raíz y completá solo el proveedor que ten
 - Estados Unidos usa las claves de una cuenta de [Alpaca](https://docs.alpaca.markets/us/docs/about-market-data-api), que pueden provenir del entorno Paper. La fuente de cotización es IEX.
 
 El servidor consulta precios por REST y guarda las respuestas durante 30 segundos. Las fichas permiten aplicar el último precio disponible como referencia. IOL muestra la hora de consulta y Alpaca la del último negocio del feed IEX. El servidor usa las credenciales para autenticarse y consultar datos de mercado. Mantené las claves en el servidor. Para un despliegue con `launchd`, configurá las variables en el entorno del servicio o usá un archivo `.env` local al checkout.
+
+El radar consulta Alpaca IEX al iniciar el servidor y cada 60 minutos. Ajustá la frecuencia con `RADAR_INTERVAL_MINUTES` (15 a 1440). Usa las acciones estadounidenses del catálogo, excluye la sesión en curso y marca retrocesos de al menos 5 % entre dos cierres disponibles. Las fichas muestran hasta 20 velas diarias ajustadas por eventos corporativos. La detección requiere claves de Alpaca y que el servidor esté encendido.

@@ -3,6 +3,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { startRadar } from './radar.js';
 import { createMarket } from './market.js';
 import { simulate } from './simulate.js';
 
@@ -15,11 +16,13 @@ function json(res, status, value) {
 }
 
 export function createApp({ quote = createMarket() } = {}) {
-  return createServer(async (req, res) => {
+  const radar = startRadar();
+  const server = createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     try {
       const url = new URL(req.url, 'http://localhost');
       const path = url.pathname;
+      if (req.method === 'GET' && path === '/api/radar') return json(res, 200, radar.get());
       if (req.method === 'GET' && path === '/api/quote') {
         const result = await quote(url.searchParams.get('country'), url.searchParams.get('id'));
         return json(res, result.status === 'unsupported' ? 404 : 200, result);
@@ -46,6 +49,8 @@ export function createApp({ quote = createMarket() } = {}) {
       json(res, 400, { error: error instanceof SyntaxError ? 'Solicitud inválida.' : error.message });
     }
   });
+  server.once('close', radar.stop);
+  return server;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
