@@ -156,12 +156,12 @@ function Detail({ entry, country, candles, values, amount, days, apply, close, p
         </header>
         {pending && <p role="status">Actualizando la simulación…</p>}
         {error && <p className="error" role="alert">{error}</p>}
+        {entry.type === 'Acción' && <Candles candles={candles} country={country} entry={entry} />}
         {entry.type === 'Acción' && <MarketQuote country={country} id={entry.id} pending={pending}
           appliedPrice={error ? undefined : values.price} applyPrice={price => {
             setDraft(previous => ({ ...previous, price }));
             apply({ ...values, price });
           }} />}
-        <Candles candles={candles} />
         <Outcome entry={entry} amount={amount} scenario={scenario} onSelect={setScenario} />
         <section className="detail-section">
           <h3>Cómo se gana o se pierde</h3>
@@ -193,10 +193,10 @@ function Detail({ entry, country, candles, values, amount, days, apply, close, p
             <button className="primary" type="submit" disabled={pending}>Aplicar y simular</button>
           </form>
         </details>
-        <section className="detail-section">
+        {entry.type !== 'Acción' && <section className="detail-section">
           <h3>Por qué podría convenirte</h3>
           <p>{entry.why} {entry.tradeoff}</p>
-        </section>
+        </section>}
         <details className="detail-guide">
           <summary>Cómo hacer la inversión</summary>
           {entry.requirement && <p className="notice">{entry.requirement}</p>}
