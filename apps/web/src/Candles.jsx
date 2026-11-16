@@ -70,7 +70,7 @@ export function Candles({ candles = [], country, entry }) {
   if (country === 'AR') candles = localHistory.candles ?? [];
   const historical = candles.length > 0;
   const money = historical && country === 'AR' ? ars : usd;
-  const source = country === 'AR' ? 'Velas diarias en ARS · IOL BCBA' : 'Velas diarias en USD · Alpaca IEX';
+  const source = country === 'AR' ? `Velas diarias en ARS · ${localHistory.source}` : 'Velas diarias en USD · Alpaca IEX';
   const series = historical ? candles : showExample ? exampleCandles : [];
   const reading = readPrice(series);
   return <section className="detail-section stock-reading" aria-labelledby="stock-reading-title">
@@ -78,13 +78,13 @@ export function Candles({ candles = [], country, entry }) {
     <p>{entry.why} {entry.tradeoff}</p>
     {entry.reason && <p className="notice">{entry.reason}</p>}
     {!historical && <div className="notice">
-      <p>{country === 'AR' ? ({ loading: 'Consultando el historial de IOL…', unconfigured: 'Configurá IOL para ver el historial argentino.', unavailable: 'El historial de IOL no está disponible para esta acción.' }[localHistory.status]) : 'El historial de Alpaca IEX todavía no está disponible para esta acción.'}</p>
+      <p>{country === 'AR' ? ({ loading: 'Consultando el historial argentino…', unavailable: 'El historial argentino no está disponible para esta acción.' }[localHistory.status]) : 'El historial de Alpaca IEX todavía no está disponible para esta acción.'}</p>
       <button type="button" className="quote-refresh" aria-pressed={showExample} onClick={() => setShowExample(value => !value)}>
         {showExample ? 'Ocultar gráfico de ejemplo' : 'Ver cómo se lee un gráfico de ejemplo'}
       </button>
     </div>}
     {series.length > 0 && <>
-      <p className="eyebrow">{historical ? `${entry.symbol} · ${source}` : 'Ejemplo ficticio · Precios en USD'}</p>
+      <p className="eyebrow">{historical ? `${entry.symbol} · ${source} · Último cierre del gráfico: ${series.at(-1).date}` : 'Ejemplo ficticio · Precios en USD'}</p>
       <CandlePlot key={historical ? 'market' : 'example'} candles={series} reading={reading} money={money} />
     </>}
     {reading && <div className="reading-cards">

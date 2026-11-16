@@ -85,7 +85,6 @@ export function createMarket({ env = process.env, fetchData = fetch } = {}) {
   async function history(id) {
     const entry = catalog.AR.find(item => item.id === id && item.type === 'Acción');
     if (!entry) return { status: 'unsupported' };
-    if (!env.IOL_USERNAME || !env.IOL_PASSWORD) return { status: 'unconfigured' };
     const cached = historyCache.get(id);
     if (cached && Date.now() < cached.until) return cached.result;
 
@@ -93,16 +92,26 @@ export function createMarket({ env = process.env, fetchData = fetch } = {}) {
       const calendar = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
       const now = Date.now();
       const today = calendar.format(now);
-      const params = new URLSearchParams({
-        market: 'BCBA', from: calendar.format(now - 45 * 86400000) + ' 00:00:00',
-        to: today + ' 00:00:00'
-      });
-      const token = await iolToken();
-      const { data } = await readJson(fetchData,
-        iolBase + '/broker/market-data/' + entry.symbol + '/bars?' + params,
-        { headers: { Authorization: 'Bearer ' + token } });
+      let source;
+      let bars;
+      if (env.IOL_USERNAME && env.IOL_PASSWORD) {
+        const params = new URLSearchParams({
+          market: 'BCBA', from: calendar.format(now - 45 * 86400000) + ' 00:00:00',
+          to: today + ' 00:00:00'
+        });
+        const token = await iolToken();
+        const { data } = await readJson(fetchData,
+          iolBase + '/broker/market-data/' + entry.symbol + '/bars?' + params,
+          { headers: { Authorization: 'Bearer ' + token } });
+        bars = data.bars;
+        source = 'IOL · BCBA';
+      } else {
+        const data = await readJson(fetchData, 'https://data912.com/historical/stocks/' + entry.symbol);
+        bars = data.map(({ date, o, h, l, c }) => ({ datetime: date, open: o, high: h, low: l, close: c }));
+        source = 'Data912 · Histórico diario';
+      }
       const candles = new Map();
-      for (const { datetime, open, high, low, close } of data.bars) {
+      for (const { datetime, open, high, low, close } of bars) {
         const date = datetime?.slice(0, 10);
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date >= today) continue;
         if (![open, high, low, close].every(value => Number.isFinite(value) && value > 0)
@@ -110,7 +119,7 @@ export function createMarket({ env = process.env, fetchData = fetch } = {}) {
         candles.set(date, { date, open, high, low, close });
       }
       const series = [...candles.values()].sort((a, b) => a.date.localeCompare(b.date)).slice(-20);
-      return { status: series.length ? 'ok' : 'unavailable', candles: series };
+      return { status: series.length ? 'ok' : 'unavailable', candles: series, source };
     }
 
     const result = load().catch(() => ({ status: 'unavailable' }));
