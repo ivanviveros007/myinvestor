@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { exampleCandles, readPrice } from './priceReading.js';
 
-const money = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'USD' });
+const usd = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'USD' });
+const ars = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', currencyDisplay: 'code' });
 const percent = new Intl.NumberFormat('es-AR', {
   style: 'percent', maximumFractionDigits: 1, signDisplay: 'exceptZero'
 });
 
-function CandlePlot({ candles, reading }) {
+function CandlePlot({ candles, reading, money }) {
   const [selected, setSelected] = useState(null);
   const candle = candles.find(item => item.date === selected) ?? candles.at(-1);
   const min = Math.min(...candles.map(item => item.low));
@@ -17,7 +18,7 @@ function CandlePlot({ candles, reading }) {
 
   return <>
     <div className="price-chart">
-      <div className="candles" role="group" aria-label="Velas diarias en dólares">
+      <div className="candles" role="group" aria-label="Velas diarias">
         {guides.map((price, index) => <span className="price-gridline" key={index} style={{ bottom: position(price) + '%' }} aria-hidden="true" />)}
         {reading && [reading.upper, reading.lower].map((price, index) =>
           <span className="price-level" key={index} style={{ bottom: position(price) + '%' }} aria-hidden="true" />)}
@@ -49,7 +50,27 @@ function CandlePlot({ candles, reading }) {
 
 export function Candles({ candles = [], country, entry }) {
   const [showExample, setShowExample] = useState(false);
+  const [localHistory, setLocalHistory] = useState({ status: 'loading' });
+  useEffect(() => {
+    if (country !== 'AR') return;
+    const controller = new AbortController();
+    const base = window.location.origin + window.location.pathname.replace(/\/?$/, '/');
+    const url = new URL('api/history', base);
+    url.searchParams.set('id', entry.id);
+    fetch(url, { signal: controller.signal })
+      .then(response => {
+        if (!response.ok) throw new Error();
+        return response.json();
+      })
+      .then(data => { if (!controller.signal.aborted) setLocalHistory(data); })
+      .catch(() => { if (!controller.signal.aborted) setLocalHistory({ status: 'unavailable' }); });
+    return () => controller.abort();
+  }, [country, entry.id]);
+
+  if (country === 'AR') candles = localHistory.candles ?? [];
   const historical = candles.length > 0;
+  const money = historical && country === 'AR' ? ars : usd;
+  const source = country === 'AR' ? 'Velas diarias en ARS · IOL BCBA' : 'Velas diarias en USD · Alpaca IEX';
   const series = historical ? candles : showExample ? exampleCandles : [];
   const reading = readPrice(series);
   return <section className="detail-section stock-reading" aria-labelledby="stock-reading-title">
@@ -57,14 +78,14 @@ export function Candles({ candles = [], country, entry }) {
     <p>{entry.why} {entry.tradeoff}</p>
     {entry.reason && <p className="notice">{entry.reason}</p>}
     {!historical && <div className="notice">
-      <p>{country === 'AR' ? 'El historial de acciones argentinas todavía no está conectado.' : 'El historial de Alpaca IEX todavía no está disponible para esta acción.'}</p>
+      <p>{country === 'AR' ? ({ loading: 'Consultando el historial de IOL…', unconfigured: 'Configurá IOL para ver el historial argentino.', unavailable: 'El historial de IOL no está disponible para esta acción.' }[localHistory.status]) : 'El historial de Alpaca IEX todavía no está disponible para esta acción.'}</p>
       <button type="button" className="quote-refresh" aria-pressed={showExample} onClick={() => setShowExample(value => !value)}>
         {showExample ? 'Ocultar gráfico de ejemplo' : 'Ver cómo se lee un gráfico de ejemplo'}
       </button>
     </div>}
     {series.length > 0 && <>
-      <p className="eyebrow">{historical ? `${entry.symbol} · Velas diarias en USD · Alpaca IEX` : 'Ejemplo ficticio · Precios en USD'}</p>
-      <CandlePlot key={historical ? 'market' : 'example'} candles={series} reading={reading} />
+      <p className="eyebrow">{historical ? `${entry.symbol} · ${source}` : 'Ejemplo ficticio · Precios en USD'}</p>
+      <CandlePlot key={historical ? 'market' : 'example'} candles={series} reading={reading} money={money} />
     </>}
     {reading && <div className="reading-cards">
       <p className="reading-head"><strong>{reading.condition === 'breakout' ? 'Cerró por encima del rango reciente' : reading.condition === 'breakdown' ? 'Cerró por debajo del rango reciente' : 'Sigue dentro del rango reciente'}</strong>

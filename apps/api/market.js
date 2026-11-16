@@ -19,6 +19,7 @@ function date(value) {
 
 export function createMarket({ env = process.env, fetchData = fetch } = {}) {
   const cache = new Map();
+  const historyCache = new Map();
   let login;
   let tokenExpires = 0;
 
@@ -59,7 +60,7 @@ export function createMarket({ env = process.env, fetchData = fetch } = {}) {
     return { price, change, tradedAt: date(latestTrade?.t) };
   }
 
-  return async function quote(country, id) {
+  async function quote(country, id) {
     const entry = Object.hasOwn(catalog, country) && catalog[country].find(item => item.id === id);
     if (entry?.type !== 'Acción') return { status: 'unsupported' };
     const local = country === 'AR';
@@ -79,5 +80,43 @@ export function createMarket({ env = process.env, fetchData = fetch } = {}) {
     }).catch(() => ({ status: 'unavailable', source }));
     cache.set(key, { until: Date.now() + quoteTtl, result });
     return result;
-  };
+  }
+
+  async function history(id) {
+    const entry = catalog.AR.find(item => item.id === id && item.type === 'Acción');
+    if (!entry) return { status: 'unsupported' };
+    if (!env.IOL_USERNAME || !env.IOL_PASSWORD) return { status: 'unconfigured' };
+    const cached = historyCache.get(id);
+    if (cached && Date.now() < cached.until) return cached.result;
+
+    async function load() {
+      const calendar = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+      const now = Date.now();
+      const today = calendar.format(now);
+      const params = new URLSearchParams({
+        market: 'BCBA', from: calendar.format(now - 45 * 86400000) + ' 00:00:00',
+        to: today + ' 00:00:00'
+      });
+      const token = await iolToken();
+      const { data } = await readJson(fetchData,
+        iolBase + '/broker/market-data/' + entry.symbol + '/bars?' + params,
+        { headers: { Authorization: 'Bearer ' + token } });
+      const candles = new Map();
+      for (const { datetime, open, high, low, close } of data.bars) {
+        const date = datetime?.slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date >= today) continue;
+        if (![open, high, low, close].every(value => Number.isFinite(value) && value > 0)
+          || high < Math.max(open, close) || low > Math.min(open, close)) continue;
+        candles.set(date, { date, open, high, low, close });
+      }
+      const series = [...candles.values()].sort((a, b) => a.date.localeCompare(b.date)).slice(-20);
+      return { status: series.length ? 'ok' : 'unavailable', candles: series };
+    }
+
+    const result = load().catch(() => ({ status: 'unavailable' }));
+    historyCache.set(id, { until: Date.now() + quoteTtl, result });
+    return result;
+  }
+
+  return Object.assign(quote, { history });
 }

@@ -23,6 +23,10 @@ export function createApp({ quote = createMarket() } = {}) {
       const url = new URL(req.url, 'http://localhost');
       const path = url.pathname;
       if (req.method === 'GET' && path === '/api/radar') return json(res, 200, radar.get());
+      if (req.method === 'GET' && path === '/api/history' && quote.history) {
+        const result = await quote.history(url.searchParams.get('id'));
+        return json(res, result.status === 'unsupported' ? 404 : 200, result);
+      }
       if (req.method === 'GET' && path === '/api/quote') {
         const result = await quote(url.searchParams.get('country'), url.searchParams.get('id'));
         return json(res, result.status === 'unsupported' ? 404 : 200, result);
